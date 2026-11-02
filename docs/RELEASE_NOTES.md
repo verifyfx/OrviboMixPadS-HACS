@@ -1,5 +1,13 @@
 Experimental ORVIBO MixPad S integration for Home Assistant 2026.3 or later.
 
+Version 0.2.0 introduces IP-first setup: enter one MixPad's LAN IP and your
+account, enable cloud inventory, and its supported lights are imported
+automatically. No device IDs, endpoints or JSON are needed for this path.
+Add more panel IPs through Configure. Blank-UID firmware uses a unique cloud
+IP match or asks you to select a panel by its connected light names. Conflicting
+nonempty identities are rejected. Existing entries retain their known panels;
+enter their IPs in Configure to supply explicit trusted addresses.
+
 Download **orvibo_mixpad.zip** below. For manual installation, extract its contents
 into `custom_components/orvibo_mixpad/` under your Home Assistant configuration.
 HACS uses the same ZIP asset. `SHA256SUMS` contains the archive checksum.

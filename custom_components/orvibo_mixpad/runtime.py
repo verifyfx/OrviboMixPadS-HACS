@@ -27,6 +27,7 @@ class Runtime:
         self.cloud = None
         self.cloud_ok = False
         self.inventory_complete = False
+        self.selected = entry.options.get("selected_gateways", entry.data.get("selected_gateways"))
         if entry.options.get("cloud_enabled", entry.data["cloud_enabled"]):
             self.cloud = CloudAccount(entry.data["username"], entry.data["password_hash"], gate,
                                       make_transport(session, entry.data["server"]))
@@ -52,17 +53,22 @@ class Runtime:
                       "relays": self.entry.data.get("initial_relays", [])}
         self.hosts.update({uid: host for uid, host in cached.get("hosts", {}).items()
                            if isinstance(uid, str) and private_ipv4(host)})
-        for row in cached.get("relays", []):
+        cached_uids = {row.get("uid") for row in cached.get("relays", []) if isinstance(row, dict)}
+        cached_uids.update(cached.get("imported_gateway_uids", []))
+        imported = [row for row in self.entry.options.get("imported_relays", []) if row.get("uid") not in cached_uids]
+        for row in cached.get("relays", []) + imported:
             try:
                 relay = Relay.from_row(row)
             except ValueError:
                 continue
-            self.relays[relay.key] = relay
+            if self.selected is None or relay.uid in self.selected:
+                self.relays[relay.key] = relay
         self.manual = self.entry.options.get("topology", self.entry.data["topology"])
         self.hosts.update(self.manual["gateways"])
         for row in self.manual["relays"]:
             relay = Relay.from_row(row)
-            self.relays[relay.key] = relay
+            if self.selected is None or relay.uid in self.selected:
+                self.relays[relay.key] = relay
         # Start known addresses immediately; cloud outages never block local startup.
         self._reconcile()
         self._background(self._poll(), "ORVIBO account inventory")
@@ -135,7 +141,8 @@ class Runtime:
                 gateway = self.gateways.get(relay.uid)
                 if gateway:
                     gateway.relays.pop(key, None)
-        self.relays.update(snapshot.relays)
+        self.relays.update({key: relay for key, relay in snapshot.relays.items()
+                            if self.selected is None or relay.uid in self.selected})
         active_uids = {relay.uid for relay in self.relays.values()}
         for uid in tuple(self.gateways):
             if uid not in active_uids:
@@ -146,7 +153,7 @@ class Runtime:
                 await self.gateways.pop(uid).close()
         # Never change a connected gateway based on a cloud address alone.
         for uid, host in snapshot.hosts.items():
-            if uid not in self.manual["gateways"]:
+            if uid not in self.manual["gateways"] and (self.selected is None or uid in self.selected):
                 self.hosts[uid] = host
         self._reconcile()
         by_device = {}
@@ -165,7 +172,8 @@ class Runtime:
             if gateway:
                 gateway.states[relay.key].cloud(row, snapshot.started)
         await self.store.async_save({"hosts": self.hosts,
-                                     "relays": [r.as_row() for r in self.relays.values()]})
+                                     "relays": [r.as_row() for r in self.relays.values()],
+                                     "imported_gateway_uids": self.selected or []})
         self.changed()
 
     async def _poll(self):

@@ -15,7 +15,7 @@ COMPONENT = ROOT / "custom_components/orvibo_mixpad"
 SEMVER = r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
 FILES = {"__init__.py", "cloud.py", "config_flow.py", "const.py", "diagnostics.py",
          "discovery.py", "light.py", "local.py", "manifest.json", "models.py",
-         "protocol.py", "runtime.py", "strings.json", "transport.py", "translations/en.json",
+         "protocol.py", "runtime.py", "strings.json", "transport.py", "onboarding.py", "translations/en.json",
          "brand/icon.png", "brand/icon@2x.png", "LICENSE", "THIRD_PARTY_NOTICES.md"}
 
 

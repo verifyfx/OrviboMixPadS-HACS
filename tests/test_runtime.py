@@ -83,6 +83,33 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(gateway.connected)
         self.assertFalse(self.runtime.cloud_ok)
 
+    async def test_panel_scope_excludes_other_account_relays_and_imports_new(self):
+        await self.runtime.close()
+        first = Relay("test-gateway", "test-relay", 1, "First")
+        second = Relay("other-test-panel", "other-test-relay", 0, "Second")
+        entry = Entry()
+        entry.options = {"discovery": False, "selected_gateways": [first.uid]}
+        self.runtime = Runtime(None, entry, None, None)
+        await self.runtime.start()
+        data = Snapshot({first.key: first, second.key: second}, {second.uid: "192.168.50.21"}, [], 1)
+        self.runtime.cloud = types.SimpleNamespace(refresh=AsyncMock(return_value=data), close=AsyncMock())
+        await self.runtime._refresh_cloud()
+        self.assertEqual(set(self.runtime.relays), {first.key})
+        self.assertNotIn(second.uid, self.runtime.gateways)
+
+    async def test_options_import_adds_new_panel_before_next_cloud_fetch(self):
+        await self.runtime.close()
+        relay = Relay("new-test-panel", "new-test-relay", 1, "New panel relay")
+        entry = Entry()
+        entry.options = {"discovery": False, "selected_gateways": ["test-gateway", relay.uid],
+                         "imported_relays": [relay.as_row()],
+                         "topology": {"gateways": dict(Entry.data["topology"]["gateways"], **{
+                             relay.uid: "192.168.50.21"}), "relays": Entry.data["topology"]["relays"]}}
+        self.runtime = Runtime(None, entry, None, None)
+        await self.runtime.start()
+        self.assertIn(relay.key, self.runtime.relays)
+        self.assertEqual(len(self.runtime.gateways), 2)
+
     async def test_cache_wins_over_initial_cloud_inventory(self):
         await self.runtime.close()
         entry = Entry()

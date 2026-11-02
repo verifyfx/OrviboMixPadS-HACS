@@ -17,6 +17,7 @@ from .cloud import CloudAccount, CloudAuthError, CloudError, password_digest
 from .const import CLOUD_HOSTS, DEFAULT_HOST, DEFAULT_REFRESH, DOMAIN
 from .local import Gateway
 from .models import Relay, private_ipv4
+from .onboarding import confirm_panel, identify_panel, import_panel, panel_choices
 from .protocol import AuthenticationError, ProtocolError
 from .transport import make_transport
 
@@ -70,6 +71,18 @@ async def validate(hass, data):
     return result
 
 
+def panel_schema(snapshot):
+    return vol.Schema({vol.Required("gateway_uid"): selector.SelectSelector(
+        selector.SelectSelectorConfig(options=[{"value": uid, "label": label}
+                                              for uid, label in panel_choices(snapshot).items()]))})
+
+
+def remember_inventory(data, snapshot, scope):
+    data["initial_relays"] = [r.as_row() for r in snapshot.relays.values() if r.uid in scope]
+    data["initial_hosts"] = {uid: host for uid, host in snapshot.hosts.items() if uid in scope}
+    data["selected_gateways"] = scope
+
+
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
@@ -77,8 +90,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
         if user_input is not None:
             try:
-                topology = parse_topology(user_input["topology"])
+                topology = parse_topology(user_input.get("topology") or EMPTY_TOPOLOGY)
                 cloud = user_input["cloud_enabled"]
+                host = user_input.get("mixpad_ip")
+                if cloud and not private_ipv4(host):
+                    errors["base"] = "invalid_ip"
+                    return self._user_form(errors)
                 if not cloud and not topology["relays"]:
                     raise ValueError("Local-only setup requires relay metadata")
                 data = {"username": user_input["username"].strip(),
@@ -90,10 +107,18 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 unique = hashlib.sha256(data["username"].encode()).hexdigest()
                 await self.async_set_unique_id(unique)
                 self._abort_if_unique_id_configured()
-                snapshot = await validate(self.hass, data)
+                # Normal cloud setup validates the explicitly entered panel only.
+                validation_data = dict(data, topology={"gateways": {}, "relays": []}) if cloud else data
+                snapshot = await validate(self.hass, validation_data)
                 if snapshot:
-                    data["initial_relays"] = [r.as_row() for r in snapshot.relays.values()]
-                    data["initial_hosts"] = snapshot.hosts
+                    if not panel_choices(snapshot):
+                        errors["base"] = "no_supported_devices"
+                        return self._user_form(errors)
+                    self._panel_data, self._panel_snapshot, self._panel_host = data, snapshot, host
+                    uid = await identify_panel(host, data, snapshot)
+                    if uid is None:
+                        return await self.async_step_select_gateway()
+                    return self._finish_panel(uid)
                 return self.async_create_entry(title="ORVIBO MixPad S", data=data)
             except (ValueError, TypeError, KeyError):
                 errors["base"] = "invalid_topology"
@@ -101,13 +126,42 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_auth"
             except (CloudError, ProtocolError, OSError, TimeoutError):
                 errors["base"] = "cannot_connect"
+        return self._user_form(errors)
+
+    def _user_form(self, errors):
         return self.async_show_form(step_id="user", errors=errors, data_schema=vol.Schema({
+            vol.Required("mixpad_ip"): str,
             vol.Required("username"): str,
             vol.Required(password_field()): PASSWORD,
             vol.Required("cloud_enabled", default=False): bool,
             vol.Required("server", default=DEFAULT_HOST): vol.In(CLOUD_HOSTS),
-            vol.Required("topology", default=EMPTY_TOPOLOGY): JSON_INPUT,
+            vol.Optional("topology"): JSON_INPUT,
         }))
+
+    def _finish_panel(self, uid):
+        data, snapshot = self._panel_data, self._panel_snapshot
+        topology, scope, _ = import_panel(data, snapshot, uid, self._panel_host)
+        data["topology"] = topology
+        remember_inventory(data, snapshot, scope)
+        return self.async_create_entry(title="ORVIBO MixPad S", data=data)
+
+    async def async_step_select_gateway(self, user_input=None):
+        errors = {}
+        if user_input:
+            uid = user_input["gateway_uid"]
+            if uid not in panel_choices(self._panel_snapshot):
+                errors["base"] = "cannot_connect"
+            else:
+                try:
+                    await confirm_panel(self._panel_host, uid, self._panel_data)
+                    return self._finish_panel(uid)
+                except AuthenticationError:
+                    errors["base"] = "invalid_auth"
+                except (ProtocolError, OSError, TimeoutError):
+                    errors["base"] = "cannot_connect"
+        return self.async_show_form(step_id="select_gateway", errors=errors,
+                                   description_placeholders={"host": self._panel_host},
+                                   data_schema=panel_schema(self._panel_snapshot))
 
     @staticmethod
     @callback
@@ -125,7 +179,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data["cloud_enabled"] = entry.options.get("cloud_enabled", data["cloud_enabled"])
             data["topology"] = entry.options.get("topology", data["topology"])
             try:
-                await validate(self.hass, data)
+                validation_data = dict(data, topology={"gateways": {}, "relays": []}) if data["cloud_enabled"] else data
+                await validate(self.hass, validation_data)
                 return self.async_update_reload_and_abort(entry, data_updates={
                     "password_hash": data["password_hash"]})
             except (CloudAuthError, AuthenticationError):
@@ -142,24 +197,89 @@ class OptionsFlow(config_entries.OptionsFlow):
         errors = {}
         if user_input is not None:
             try:
-                topology = parse_topology(user_input["topology"])
-                if not user_input["cloud_enabled"] and not topology["relays"] and not entry.data.get("initial_relays"):
+                topology = parse_topology(user_input["topology"]) if user_input.get("topology") else entry.options.get(
+                    "topology", entry.data["topology"])
+                if (not user_input["cloud_enabled"] and not topology["relays"]
+                        and not entry.data.get("initial_relays") and not entry.options.get("imported_relays")):
                     raise ValueError("Local-only setup requires metadata")
                 data = dict(entry.data, cloud_enabled=user_input["cloud_enabled"], topology=topology)
+                options = dict(entry.options, **user_input)
+                options["topology"] = topology
+                options.pop("mixpad_ip", None)
+                host = user_input.get("mixpad_ip", "").strip()
+                if host:
+                    if not private_ipv4(host):
+                        errors["base"] = "invalid_ip"
+                        return self._options_form(errors)
+                    if not user_input["cloud_enabled"]:
+                        errors["base"] = "cloud_required"
+                        return self._options_form(errors)
+                    runtime = getattr(entry, "runtime_data", None)
+                    if runtime and runtime.cloud:
+                        snapshot = await runtime.cloud.refresh()
+                    else:
+                        snapshot = await validate(self.hass, dict(data, topology={"gateways": {}, "relays": []}))
+                    if not panel_choices(snapshot):
+                        errors["base"] = "no_supported_devices"
+                        return self._options_form(errors)
+                    self._panel_data, self._panel_snapshot, self._panel_host = data, snapshot, host
+                    self._panel_options = options
+                    uid = await identify_panel(host, data, snapshot)
+                    if uid is None:
+                        return await self.async_step_select_gateway()
+                    return self._finish_panel(uid)
                 # Avoid a login on every refresh-interval edit.
                 if user_input["cloud_enabled"] and not entry.options.get("cloud_enabled", entry.data["cloud_enabled"]):
-                    await validate(self.hass, data)
-                return self.async_create_entry(title="", data=dict(user_input, topology=topology))
+                    await validate(self.hass, dict(data, topology={"gateways": {}, "relays": []}))
+                return self.async_create_entry(title="", data=options)
             except (ValueError, TypeError, KeyError):
                 errors["base"] = "invalid_topology"
             except (CloudAuthError, AuthenticationError):
                 errors["base"] = "invalid_auth"
             except (CloudError, ProtocolError, OSError, TimeoutError):
                 errors["base"] = "cannot_connect"
+        return self._options_form(errors)
+
+    def _options_form(self, errors):
+        entry = self.config_entry
         return self.async_show_form(step_id="init", errors=errors, data_schema=vol.Schema({
+            vol.Optional("mixpad_ip"): str,
             vol.Required("cloud_enabled", default=entry.options.get("cloud_enabled", entry.data["cloud_enabled"])): bool,
             vol.Required("refresh_seconds", default=entry.options.get("refresh_seconds", DEFAULT_REFRESH)): vol.All(
                 vol.Coerce(int), vol.Range(min=900, max=86400)),
             vol.Required("discovery", default=entry.options.get("discovery", True)): bool,
-            vol.Required("topology", default=json.dumps(entry.options.get("topology", entry.data["topology"]))): JSON_INPUT,
+            vol.Optional("topology"): JSON_INPUT,
         }))
+
+    def _finish_panel(self, uid):
+        entry, snapshot = self.config_entry, self._panel_snapshot
+        selected = entry.options.get("selected_gateways", entry.data.get("selected_gateways"))
+        if selected is None:
+            # Preserve all known panels for entries created before panel-scoped setup.
+            runtime = getattr(entry, "runtime_data", None)
+            rows = runtime.relays.values() if runtime else [Relay.from_row(r) for r in entry.data.get("initial_relays", [])]
+            selected = sorted({r.uid for r in rows} | set(self._panel_data["topology"]["gateways"]))
+        topology, scope, imported = import_panel(self._panel_data, snapshot, uid, self._panel_host, selected=selected)
+        previous = {Relay.from_row(row).key: row for row in entry.options.get("imported_relays", [])}
+        previous.update({Relay.from_row(row).key: row for row in imported})
+        options = dict(self._panel_options, topology=topology, selected_gateways=scope,
+                       imported_relays=list(previous.values()))
+        return self.async_create_entry(title="", data=options)
+
+    async def async_step_select_gateway(self, user_input=None):
+        errors = {}
+        if user_input:
+            uid = user_input["gateway_uid"]
+            if uid not in panel_choices(self._panel_snapshot):
+                errors["base"] = "cannot_connect"
+            else:
+                try:
+                    await confirm_panel(self._panel_host, uid, self._panel_data)
+                    return self._finish_panel(uid)
+                except AuthenticationError:
+                    errors["base"] = "invalid_auth"
+                except (ProtocolError, OSError, TimeoutError):
+                    errors["base"] = "cannot_connect"
+        return self.async_show_form(step_id="select_gateway", errors=errors,
+                                   description_placeholders={"host": self._panel_host},
+                                   data_schema=panel_schema(self._panel_snapshot))

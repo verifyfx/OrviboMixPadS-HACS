@@ -19,7 +19,7 @@ DATA = {"username": "synthetic-user", "password_hash": password_digest("syntheti
 
 async def test_manual_flow_and_duplicate(hass):
     import json
-    user = {"username": "synthetic-user", "password": "synthetic-password",
+    user = {"mixpad_ip": "192.168.50.20", "username": "synthetic-user", "password": "synthetic-password",
             "cloud_enabled": False, "server": "usa.orvibo.com", "topology": json.dumps(TOPOLOGY)}
     with patch("custom_components.orvibo_mixpad.config_flow.validate", new=AsyncMock(return_value=None)), \
          patch("custom_components.orvibo_mixpad.async_setup_entry", new=AsyncMock(return_value=True)):

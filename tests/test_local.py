@@ -113,6 +113,15 @@ class LocalTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(self.gateway.connected)
         self.assertEqual(self.gateway.uid, UID)
 
+    async def test_read_only_identity_probe_cannot_control(self):
+        self.gateway.uid = None
+        self.gateway.trusted_host = True
+        await self.gateway.connect()
+        self.assertEqual(self.gateway.peer_uid, UID)
+        with self.assertRaises(ProtocolError):
+            await self.gateway.power(RELAY, True)
+        self.assertFalse(any(m["cmd"] == 15 for m, _ in self.fake.commands))
+
     async def test_conflicting_uid_and_auth(self):
         self.fake.uid = "different-gateway"
         self.gateway.trusted_host = True

@@ -48,6 +48,32 @@ directly into `custom_components/orvibo_mixpad/`. Restart HA yourself. Add
 
 ## Configuration
 
+### IP-first setup (recommended)
+
+1. Enter the **LAN IP of one MixPad**, your ORVIBO account and password, and
+   select the account server.
+2. Explicitly enable cloud inventory. Leave the advanced JSON field empty.
+3. The integration performs Hello/login at that IP and matches its gateway UID
+   to your account's cloud inventory. If firmware omits the UID, a unique cloud
+   address match is used. If that cannot identify the panel unambiguously, a
+   list described by its connected light names lets you select the right panel.
+4. All supported type-1 relay entities belonging to that MixPad are imported
+   automatically, including their actual endpoints. Other account panels are
+   excluded until you configure them.
+
+No device IDs, endpoints, UID copying or storage-file editing are needed for
+this path. The IP you enter is explicitly trusted, so blank-UID firmware can
+connect. A conflicting nonempty identity is always rejected. Setup performs
+login and inventory reads only; it never switches a relay.
+
+To configure another panel or update an IP, open **Configure**, enter **Add or
+update a MixPad LAN IP**, and submit. Existing panels are retained. Supported
+new lights on configured panels are added during periodic inventory refreshes.
+Entries created before 0.2.0 retain their previously imported panels; entering
+their IPs in Configure supplies explicit trusted addresses.
+
+### Account and advanced local-only setup
+
 Use the same username and original password as the ORVIBO account bound to the
 gateway. Local login also requires account credentials, but local-only mode
 never sends them to the cloud. One entry is allowed per exact account username;
@@ -88,10 +114,8 @@ not been tested here. Other hosts/regions are intentionally unavailable until
 verified. `us.orvibo.com` is not the USA API. Redirects are always refused;
 credentials are never retried through GET or a different server.
 
-Cloud setup can use `{"gateways":{},"relays":[]}`. It discovers supported
-account devices and cloud-recorded gateway addresses. You can add trusted IP
-overrides using `{"gateways":{"your-gateway-uid":"192.168.50.20"},"relays":[]}`.
-Cloud snapshots and gateway addresses are cached in HA for local startup.
+Cloud setup uses the IP-first flow above. The optional JSON field can remain
+empty. Cloud snapshots and gateway addresses are cached in HA for local startup.
 
 **Gateway discovery:** bounded IPv4 UDP broadcast to port 10000 uses upstream's
 `cmd86` format. Only known cloud/manual gateway UIDs are considered. A discovered
@@ -105,7 +129,7 @@ verified against this hardware.
 
 ## Updates, options and state
 
-Options control cloud consent, UDP discovery, trusted IP/manual relay metadata,
+Options control cloud consent, UDP discovery, panel IPs/manual relay metadata,
 and the account refresh interval (900–86400 seconds, default 1800). A reload
 applies options. Disable cloud to stop future cloud requests; cached topology
 remains available locally. Changed credentials use HA's reauthentication flow.
@@ -122,7 +146,7 @@ session. Rejected login stops polling and requests reauthentication. These
 limits reduce load and cannot guarantee avoidance of vendor rate limits/bans.
 
 Reconciliation reads all returned account families and adds newly supported
-relays without duplicating entity IDs. Explicit metadata changes can revoke
+relays on configured panels without duplicating entity IDs. Explicit metadata changes can revoke
 support or replace an endpoint; old entities become unavailable. Missing rows
 do not remove devices. Names and endpoint IDs come from inventory, without
 guessing another gateway when ownership is missing.

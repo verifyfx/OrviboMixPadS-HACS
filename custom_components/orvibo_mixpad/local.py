@@ -20,6 +20,7 @@ class Gateway:
         self.trusted_host, self.port = trusted_host, port
         self.changed, self.interval, self.timeout = changed, max(1, interval), timeout
         self.connected = False
+        self.peer_uid = None
         self.states = {}
         self.relays = {}
         self._session, self._key = EMPTY_SESSION, DEFAULT_KEY
@@ -56,7 +57,10 @@ class Gateway:
                     raise AuthenticationError("Gateway login rejected")
                 identities = [message[field] for message in (hello, login)
                               for field in ("uid", "gatewayUid", "gatewayUID") if message.get(field)]
-                if any(v != self.uid for v in identities):
+                if identities and any(v != identities[0] for v in identities):
+                    raise ProtocolError("Gateway identity mismatch")
+                self.peer_uid = identities[0] if identities else None
+                if self.uid is not None and self.peer_uid is not None and self.peer_uid != self.uid:
                     raise ProtocolError("Gateway identity mismatch")
                 if not identities and not self.trusted_host:
                     raise ProtocolError("Discovery requires a handshake UID; specify a trusted IP")
@@ -146,7 +150,7 @@ class Gateway:
 
     async def power(self, relay, on):
         async with self._control_lock:
-            if relay.key not in self.relays:
+            if self.uid is None or relay.key not in self.relays:
                 raise ProtocolError("Relay no longer supported")
             state = self.states[relay.key]
             if not self.connected:
@@ -219,6 +223,7 @@ class Gateway:
                 await self._writer.wait_closed()
             self._writer = None
         self._session, self._key = EMPTY_SESSION, DEFAULT_KEY
+        self.peer_uid = None
         for state in self.states.values():
             state.reset()
         self.changed()
