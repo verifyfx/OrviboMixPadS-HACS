@@ -61,7 +61,7 @@ class CloudTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(a.hosts, {"gw-test": "192.168.50.20"})
         await account.refresh()
         self.assertEqual(len(fake.calls), 3)
-        account.cached_at = 0
+        account.cached_at = time.monotonic() - 61
         fake.data["device"].append({"uid": "gw-test", "deviceId": "new-relay", "endpoint": 0, "deviceType": 1})
         self.assertEqual(len((await account.refresh()).relays), 2)
         self.assertEqual(sum(c[2] for c in fake.calls), 1)

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1 — 2026-11-02
+
+- Publish the integration ZIP and checksum on the GitHub release page.
+- Make the cache-expiry test independent of CI runner uptime. The v0.1.0
+  release gate caught this test assumption before any release assets were published.
+
 ## 0.1.0 — 2026-11-02
 
 - Initial experimental MixPad S type-1 on/off relay integration.
