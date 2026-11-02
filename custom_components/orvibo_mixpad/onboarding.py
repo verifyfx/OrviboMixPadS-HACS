@@ -7,6 +7,28 @@ from .models import private_ipv4
 from .protocol import ProtocolError
 
 
+class DuplicatePanelError(ProtocolError):
+    """Two supplied addresses were identified as the same panel."""
+
+
+def panel_addresses(value, *, required=True):
+    """Validate all rows before any login; duplicate IP rows are harmless."""
+    if not isinstance(value, list) or len(value) > 100:
+        raise ValueError("Enter a list of MixPad IP addresses")
+    hosts = []
+    for raw in value:
+        if not isinstance(raw, str):
+            raise ValueError("Enter private LAN IPv4 addresses")
+        host = private_ipv4(raw.strip())
+        if not host:
+            raise ValueError("Enter private LAN IPv4 addresses")
+        if host not in hosts:
+            hosts.append(host)
+    if required and not hosts:
+        raise ValueError("Enter at least one MixPad IP address")
+    return hosts
+
+
 def panel_choices(snapshot):
     """Describe panels by their relay names; users never have to enter a UID."""
     grouped = {}
@@ -60,3 +82,47 @@ def import_panel(data, snapshot, uid, host, *, selected=None):
     scope = list(dict.fromkeys([*(selected or []), uid]))
     relays = [relay.as_row() for relay in snapshot.relays.values() if relay.uid in scope]
     return topology, scope, relays
+
+
+class PanelBatch:
+    """Resolve multiple supplied IPs atomically using one account snapshot."""
+
+    def __init__(self, hosts, data, snapshot, selected=None):
+        self.hosts = panel_addresses(hosts)
+        self.data, self.snapshot = deepcopy(data), snapshot
+        self.scope = list(selected or [])
+        self.seen = set()
+        self.index = 0
+
+    @property
+    def host(self):
+        return self.hosts[self.index] if self.index < len(self.hosts) else None
+
+    @property
+    def choices(self):
+        return {uid: label for uid, label in panel_choices(self.snapshot).items() if uid not in self.seen}
+
+    def accept(self, uid):
+        if uid in self.seen:
+            raise DuplicatePanelError("The same MixPad was supplied more than once")
+        topology, scope, _ = import_panel(self.data, self.snapshot, uid, self.host, selected=self.scope)
+        self.data["topology"], self.scope = topology, scope
+        self.seen.add(uid)
+        self.index += 1
+
+    async def advance(self):
+        """Stop for explicit selection only when the current address is ambiguous."""
+        while self.host is not None:
+            uid = await identify_panel(self.host, self.data, self.snapshot)
+            if uid is None:
+                if not self.choices:
+                    raise DuplicatePanelError("No remaining account panels match this address")
+                return False
+            self.accept(uid)
+        return True
+
+    async def confirm(self, uid):
+        if uid not in self.choices:
+            raise DuplicatePanelError("Panel already selected or outside this account")
+        await confirm_panel(self.host, uid, self.data)
+        self.accept(uid)

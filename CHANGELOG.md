@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.0 — 2026-11-02
+
+- Configure multiple MixPad hubs together on the first screen using repeatable
+  IP fields and one shared account inventory.
+- Enable cloud inventory/status by default for new setup, with an explicit
+  description of account transmission and a local-only opt-out. Existing
+  cloud-disabled entries keep their preference.
+- Add a Configure menu with a hub/address/status overview, Manage hubs for
+  multiple additions/updates, and separate cloud/polling settings.
+- Move local-only JSON metadata to a separate advanced setup screen.
+- Validate the entire address list before requests, collapse duplicate IP rows,
+  reject duplicate hub identities, and save the batch only after every hub validates.
+
 ## 0.2.0 — 2026-11-02
 
 - Add IP-first MixPad setup: enter a panel IP and account, then import its

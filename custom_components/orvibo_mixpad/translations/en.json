@@ -5,21 +5,21 @@
       "invalid_topology": "Enter valid topology JSON with explicit gateway UIDs, private IPv4 addresses, device IDs, deviceType 1 and actual endpoints.",
       "cannot_connect": "Connection failed. Check the trusted gateway IP and selected cloud server. Pagination or unsupported server responses may also prevent setup.",
       "invalid_auth": "Authentication failed. Check the account password.",
-      "invalid_ip": "Enter a private LAN IPv4 address for the MixPad.",
-      "cloud_required": "Enable cloud inventory to import the lights belonging to a MixPad IP.",
-      "no_supported_devices": "No MixPad panels with supported type-1 relays were found in this account."
+      "invalid_ip": "Add at least one valid private LAN IPv4 address, one per row. Public addresses and hostnames are not supported.",
+      "cloud_required": "Enable cloud connection under Cloud connection and polling to import lights for these hub IPs.",
+      "no_supported_devices": "No MixPad panels with supported type-1 relays were found in this account.",
+      "duplicate_panel": "Two addresses identify the same MixPad, or all account panels have already been assigned. Check the hub IP list. Nothing has been saved."
     },
     "step": {
       "user": {
-        "title": "Set up a MixPad",
-        "description": "Enter the LAN IP of one MixPad and its ORVIBO account. Enable cloud access to discover and import the supported type-1 lights belonging to this panel. No device IDs or JSON are needed for cloud setup. The IP you enter is explicitly trusted, including firmware that omits its gateway UID. USA is verified; China is upstream-documented only. Advanced local-only setup requires relay metadata in the optional JSON field.",
+        "title": "Set up your MixPad hubs",
+        "description": "Add every MixPad LAN IP using the address list below. Your ORVIBO account is shared by all hubs. Cloud connection is enabled by default: submitting sends your login to the selected ORVIBO server to discover supported lights and periodically read inventory and states. Commands stay local. Turn cloud off for advanced local-only setup. Each entered IP is explicitly trusted. USA is verified; China is upstream-documented only.",
         "data": {
           "server": "Cloud account server",
-          "topology": "Advanced: local-only relay metadata JSON (optional)",
           "password": "Password",
-          "cloud_enabled": "Allow cloud account inventory and status",
+          "cloud_enabled": "Use cloud connection for device inventory and status",
           "username": "ORVIBO account",
-          "mixpad_ip": "MixPad LAN IP address"
+          "mixpad_ips": "MixPad hub IP addresses (add one row per hub)"
         }
       },
       "reauth_confirm": {
@@ -30,15 +30,22 @@
         }
       },
       "select_gateway": {
-        "title": "Choose your MixPad",
-        "description": "The panel at {host} omits its identity and its cloud IP does not give a unique match. Select the panel by the lights connected to it. This trusts the IP you entered; a conflicting nonempty gateway identity is still rejected.",
+        "title": "Identify hub {current} of {total}",
+        "description": "The hub at {host} omits its identity and its cloud IP does not give a unique match. Select it by the connected light names. Hubs assigned earlier are excluded. A conflicting nonempty identity is always rejected.",
         "data": {
           "gateway_uid": "MixPad panel"
         }
+      },
+      "local": {
+        "title": "Advanced local-only setup",
+        "data": {
+          "topology": "Local relay metadata JSON"
+        },
+        "description": "Cloud access is disabled. Supply your own gateway UID, exact device IDs and actual endpoints as topology JSON. No cloud requests will be made. For automatic entity import, go back and enable cloud connection."
       }
     },
     "abort": {
-      "already_configured": "This account is already configured. Open Configure on its existing entry to add another MixPad IP."
+      "already_configured": "This account is already configured. Open Configure, then Manage hubs to add more MixPad IPs."
     }
   },
   "options": {
@@ -46,28 +53,47 @@
       "invalid_topology": "Enter valid topology JSON with explicit gateway UIDs, private IPv4 addresses, device IDs, deviceType 1 and actual endpoints.",
       "cannot_connect": "Connection failed. Check the trusted gateway IP and selected cloud server. Pagination or unsupported server responses may also prevent setup.",
       "invalid_auth": "Authentication failed. Check the account password.",
-      "invalid_ip": "Enter a private LAN IPv4 address for the MixPad.",
-      "cloud_required": "Enable cloud inventory to import the lights belonging to a MixPad IP.",
-      "no_supported_devices": "No MixPad panels with supported type-1 relays were found in this account."
+      "invalid_ip": "Add at least one valid private LAN IPv4 address, one per row. Public addresses and hostnames are not supported.",
+      "cloud_required": "Enable cloud connection under Cloud connection and polling to import lights for these hub IPs.",
+      "no_supported_devices": "No MixPad panels with supported type-1 relays were found in this account.",
+      "duplicate_panel": "Two addresses identify the same MixPad, or all account panels have already been assigned. Check the hub IP list. Nothing has been saved."
     },
     "step": {
       "init": {
-        "title": "ORVIBO MixPad S options",
-        "description": "To add another MixPad or change its address, enter its LAN IP below. Cloud inventory imports its supported lights automatically and keeps the existing panels. Leave the IP blank to change only polling options. Cloud access is optional; disabling it retains cached metadata for local control.",
-        "data": {
-          "refresh_seconds": "Account refresh / discovery interval (seconds)",
-          "discovery": "Enable bounded UDP gateway address discovery",
-          "cloud_enabled": "Allow cloud account inventory and status",
-          "topology": "Advanced: replace manual topology JSON (optional)",
-          "mixpad_ip": "Add or update a MixPad LAN IP (optional)"
+        "title": "ORVIBO MixPad S",
+        "description": "Configured hubs:\r\n\r\n{hubs}",
+        "menu_options": {
+          "settings": "Cloud connection and polling",
+          "hubs": "Manage hubs"
+        },
+        "menu_option_descriptions": {
+          "settings": "Control cloud access, polling and advanced local-only settings.",
+          "hubs": "View configured hubs and add or update several IP addresses at once."
         }
       },
       "select_gateway": {
-        "title": "Choose your MixPad",
-        "description": "The panel at {host} omits its identity and its cloud IP does not give a unique match. Select the panel by the lights connected to it. This trusts the IP you entered; a conflicting nonempty gateway identity is still rejected.",
+        "title": "Identify hub {current} of {total}",
+        "description": "The hub at {host} omits its identity and its cloud IP does not give a unique match. Select it by the connected light names. Hubs assigned earlier are excluded. A conflicting nonempty identity is always rejected.",
         "data": {
           "gateway_uid": "MixPad panel"
         }
+      },
+      "hubs": {
+        "title": "Manage MixPad hubs",
+        "data": {
+          "mixpad_ips": "Hub IP addresses to add or update"
+        },
+        "description": "Configured hubs:\r\n\r\n{hubs}\r\n\r\nAdd or update hub IPs below, one per row. Existing hubs are kept; leaving one out does not remove it. Lights are imported automatically from the shared cloud account. Cloud must be enabled under Cloud connection and polling."
+      },
+      "settings": {
+        "title": "Cloud connection and polling",
+        "data": {
+          "discovery": "Enable UDP gateway address discovery",
+          "refresh_seconds": "Account refresh interval (seconds)",
+          "cloud_enabled": "Use cloud connection for device inventory and status",
+          "topology": "Advanced: replace local topology JSON (optional)"
+        },
+        "description": "Cloud connection reads account inventory and assumed states; all power commands remain local. Disable it to stop future cloud requests and keep cached metadata. Existing opt-out settings are preserved. Advanced topology JSON is optional and replaces manual metadata."
       }
     }
   }

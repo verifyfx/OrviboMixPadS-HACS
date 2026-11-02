@@ -19,13 +19,15 @@ DATA = {"username": "synthetic-user", "password_hash": password_digest("syntheti
 
 async def test_manual_flow_and_duplicate(hass):
     import json
-    user = {"mixpad_ip": "192.168.50.20", "username": "synthetic-user", "password": "synthetic-password",
-            "cloud_enabled": False, "server": "usa.orvibo.com", "topology": json.dumps(TOPOLOGY)}
+    user = {"mixpad_ips": [], "username": "synthetic-user", "password": "synthetic-password",
+            "cloud_enabled": False, "server": "usa.orvibo.com"}
     with patch("custom_components.orvibo_mixpad.config_flow.validate", new=AsyncMock(return_value=None)), \
          patch("custom_components.orvibo_mixpad.async_setup_entry", new=AsyncMock(return_value=True)):
         result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
         assert result["type"] is FlowResultType.FORM
         result = await hass.config_entries.flow.async_configure(result["flow_id"], user)
+        assert result["step_id"] == "local"
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {"topology": json.dumps(TOPOLOGY)})
         assert result["type"] is FlowResultType.CREATE_ENTRY
         assert "password" not in result["data"]
         await hass.async_block_till_done()
@@ -66,6 +68,8 @@ async def test_options_and_reauth(hass):
     with patch("custom_components.orvibo_mixpad.config_flow.validate", new=AsyncMock()), \
          patch("homeassistant.config_entries.ConfigEntries.async_reload", new=AsyncMock(return_value=True)):
         result = await hass.config_entries.options.async_init(entry.entry_id)
+        assert result["type"] is FlowResultType.MENU
+        result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "settings"})
         result = await hass.config_entries.options.async_configure(result["flow_id"], {
             "cloud_enabled": False, "refresh_seconds": 3600, "discovery": False,
             "topology": json.dumps(TOPOLOGY)})

@@ -48,26 +48,32 @@ directly into `custom_components/orvibo_mixpad/`. Restart HA yourself. Add
 
 ## Configuration
 
-### IP-first setup (recommended)
+### Multiple-hub setup (recommended)
 
-1. Enter the **LAN IP of one MixPad**, your ORVIBO account and password, and
-   select the account server.
-2. Explicitly enable cloud inventory. Leave the advanced JSON field empty.
-3. The integration performs Hello/login at that IP and matches its gateway UID
+1. Enter your ORVIBO account and password, and select the account server.
+2. Add **all your MixPad LAN IPs** to the address list, one per row. Cloud
+   connection is **enabled by default**. Submitting sends your account login
+   to the selected ORVIBO server for inventory and periodic assumed states;
+   you can turn it off before submitting for advanced local-only setup.
+3. The integration performs Hello/login at each IP and matches its gateway UID
    to your account's cloud inventory. If firmware omits the UID, a unique cloud
    address match is used. If that cannot identify the panel unambiguously, a
    list described by its connected light names lets you select the right panel.
-4. All supported type-1 relay entities belonging to that MixPad are imported
-   automatically, including their actual endpoints. Other account panels are
-   excluded until you configure them.
+4. All supported type-1 relay entities belonging to those MixPads are imported
+   together, including their actual endpoints. Other account panels are excluded
+   until you configure them. A single account inventory is shared across the batch.
 
 No device IDs, endpoints, UID copying or storage-file editing are needed for
 this path. The IP you enter is explicitly trusted, so blank-UID firmware can
 connect. A conflicting nonempty identity is always rejected. Setup performs
 login and inventory reads only; it never switches a relay.
 
-To configure another panel or update an IP, open **Configure**, enter **Add or
-update a MixPad LAN IP**, and submit. Existing panels are retained. Supported
+To configure more panels or update IPs, open **Configure → Manage hubs**. It
+shows configured hubs and their addresses/status. Add the new or changed IPs
+to its repeatable address list and submit. Existing panels are retained; leaving
+one out of this add/update list does not remove it. Duplicate IP rows are
+collapsed; two different IPs resolving to the same hub are rejected. No partial
+configuration is saved if a hub fails validation. Supported
 new lights on configured panels are added during periodic inventory refreshes.
 Entries created before 0.2.0 retain their previously imported panels; entering
 their IPs in Configure supplies explicit trusted addresses.
@@ -79,7 +85,9 @@ gateway. Local login also requires account credentials, but local-only mode
 never sends them to the cloud. One entry is allowed per exact account username;
 configure multiple gateways in that entry.
 
-**Local only:** leave cloud access disabled and provide topology JSON. Obtain
+**Local only:** turn cloud connection off on the first screen, then provide
+topology JSON on the separate advanced setup screen. No cloud request is made.
+Obtain
 the gateway UID, exact device IDs and endpoints from your own known inventory
 or a one-time cloud setup. No emulator, APK, cache extraction or decryption is
 required. The integration does not currently enumerate child devices over LAN.
@@ -107,15 +115,15 @@ All values below are invented examples; replace them with your own metadata:
 }
 ```
 
-**Cloud inventory:** explicitly enable account inventory/status and select the
+**Cloud inventory:** leave cloud connection enabled and select the
 server matching your app's account region. `usa.orvibo.com` was verified in the
 reference investigation. `china.orvibo.com` is documented by upstream but has
 not been tested here. Other hosts/regions are intentionally unavailable until
 verified. `us.orvibo.com` is not the USA API. Redirects are always refused;
 credentials are never retried through GET or a different server.
 
-Cloud setup uses the IP-first flow above. The optional JSON field can remain
-empty. Cloud snapshots and gateway addresses are cached in HA for local startup.
+Cloud setup uses the hub address list above; it has no JSON field. Cloud
+snapshots and gateway addresses are cached in HA for local startup.
 
 **Gateway discovery:** bounded IPv4 UDP broadcast to port 10000 uses upstream's
 `cmd86` format. Only known cloud/manual gateway UIDs are considered. A discovered
@@ -129,10 +137,13 @@ verified against this hardware.
 
 ## Updates, options and state
 
-Options control cloud consent, UDP discovery, panel IPs/manual relay metadata,
+**Configure → Manage hubs** controls panel IPs. **Configure → Cloud connection
+and polling** controls cloud access, UDP discovery, advanced manual relay metadata,
 and the account refresh interval (900–86400 seconds, default 1800). A reload
 applies options. Disable cloud to stop future cloud requests; cached topology
 remains available locally. Changed credentials use HA's reauthentication flow.
+Existing cloud opt-outs are preserved when upgrading; the new enabled default
+applies only to new setup forms.
 To change account or region, remove and re-add the entry.
 
 Each account shares its token and snapshots. Concurrent refreshes coalesce;
