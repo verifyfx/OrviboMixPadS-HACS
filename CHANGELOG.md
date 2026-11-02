@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 — unreleased
+## 0.1.0 — 2026-11-02
 
 - Initial experimental MixPad S type-1 on/off relay integration.
 - Shared gateway connections, bounded reconnects, gateway-wide command pacing,

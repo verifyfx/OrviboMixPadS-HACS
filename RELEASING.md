@@ -1,8 +1,8 @@
 # Release process
 
-The origin is `https://github.com/verifyfx/OrviboMixPadS-HACS.git`. Publication
-is a separate maintainer step. No source push or public release was performed
-as part of preparing this repository.
+The origin is `https://github.com/verifyfx/OrviboMixPadS-HACS.git`. Pushing a
+version tag publishes a GitHub release after all validation jobs pass. Review
+the source and release notes before pushing the tag.
 
 1. Review the complete diff and ensure only generic source, synthetic fixtures,
    docs, original brand assets and CI files are included. Check staged files
@@ -19,9 +19,9 @@ as part of preparing this repository.
 6. After publication authorization, push the reviewed branch and matching tag
    `v0.1.0`. Do not force-push. The tag workflow reruns validation and checks
    exact agreement between tag and manifest before packaging.
-7. The release job uses GitHub's `gh release create --verify-tag --generate-notes
-   --draft` to create a reviewable release with `orvibo_mixpad.zip` and
-   `SHA256SUMS`. Review generated notes and publish the draft explicitly.
+7. The release job uses GitHub's `gh release create --verify-tag --generate-notes`
+   with `docs/RELEASE_NOTES.md` to publish the release with `orvibo_mixpad.zip`
+   and `SHA256SUMS`. Confirm both assets appear on the public release page.
 
 The ZIP contains integration files at its root, which HACS installs into
 `custom_components/orvibo_mixpad/`. `hacs.json` selects that asset. The build
