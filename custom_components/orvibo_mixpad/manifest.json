@@ -1,0 +1,12 @@
+{
+  "domain": "orvibo_mixpad",
+  "name": "ORVIBO MixPad S",
+  "codeowners": ["@verifyfx"],
+  "config_flow": true,
+  "documentation": "https://github.com/verifyfx/OrviboMixPadS-HACS",
+  "integration_type": "hub",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/verifyfx/OrviboMixPadS-HACS/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

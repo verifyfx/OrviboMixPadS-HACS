@@ -1,0 +1,52 @@
+{
+  "title": "ORVIBO MixPad S",
+  "config": {
+    "error": {
+      "invalid_topology": "Enter valid topology JSON with explicit gateway UIDs, private IPv4 addresses, device IDs, deviceType 1 and actual endpoints.",
+      "cannot_connect": "Connection failed. Check the trusted gateway IP and selected cloud server. Pagination or unsupported server responses may also prevent setup.",
+      "invalid_auth": "Authentication failed. Check the account password."
+    },
+    "step": {
+      "user": {
+        "title": "Set up ORVIBO MixPad S",
+        "description": "Local control supports type-1 on/off relays only. Cloud access is optional: enabling it sends your account login to the selected ORVIBO server and periodically reads account-wide inventory and states. USA is verified; China is upstream-documented only. Discovery finds addresses for known gateway UIDs; it cannot enumerate child devices. For local-only setup, supply manual topology JSON (see README). Manual gateway IPs are explicitly trusted, including firmware that returns a blank login UID.",
+        "data": {
+          "server": "Cloud account server",
+          "topology": "Manual topology JSON / trusted IP overrides",
+          "password": "Password",
+          "cloud_enabled": "Allow cloud account inventory and status",
+          "username": "ORVIBO account"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate ORVIBO account",
+        "description": "Enter the password for the existing account. Local/cloud login will be checked without controlling relays.",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This account is already configured. Use its options to add gateway or relay metadata."
+    }
+  },
+  "options": {
+    "error": {
+      "invalid_topology": "Enter valid topology JSON with explicit gateway UIDs, private IPv4 addresses, device IDs, deviceType 1 and actual endpoints.",
+      "cannot_connect": "Connection failed. Check the trusted gateway IP and selected cloud server. Pagination or unsupported server responses may also prevent setup.",
+      "invalid_auth": "Authentication failed. Check the account password."
+    },
+    "step": {
+      "init": {
+        "title": "ORVIBO MixPad S options",
+        "description": "Cloud refresh is account-wide with jitter and backoff (minimum 15 minutes). Disable cloud to stop future cloud requests. Cached inventory remains usable locally. Manual gateway addresses override discovery; relays need deviceType 1 and actual endpoints. Discovered devices are added automatically; inventory completeness remains unverified.",
+        "data": {
+          "refresh_seconds": "Account refresh / discovery interval (seconds)",
+          "discovery": "Enable bounded UDP gateway address discovery",
+          "cloud_enabled": "Allow cloud account inventory and status",
+          "topology": "Manual topology JSON / trusted IP overrides"
+        }
+      }
+    }
+  }
+}
